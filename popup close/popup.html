@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Popup & Redirect Closer</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --card-bg: #f8fafc;
+    --fg: #0f172a;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --danger: #dc2626;
+    --success: #16a34a;
+    --chip: #f1f5f9;
+    --chip-border: #cbd5e1;
+    --tag-offsite-bg: #eff6ff;
+    --tag-offsite-fg: #1d4ed8;
+    --tag-redirect-bg: #fff7ed;
+    --tag-redirect-fg: #c2410c;
+    --tag-blank-bg: #f1f5f9;
+    --tag-blank-fg: #475569;
+    --tag-popup-bg: #fef2f2;
+    --tag-popup-fg: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --fg: #f8fafc;
+      --muted: #94a3b8;
+      --line: #334155;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --chip: #1e293b;
+      --chip-border: #475569;
+      --tag-offsite-bg: #1e3a8a;
+      --tag-offsite-fg: #93c5fd;
+      --tag-redirect-bg: #431407;
+      --tag-redirect-fg: #fdba74;
+      --tag-blank-bg: #334155;
+      --tag-blank-fg: #cbd5e1;
+      --tag-popup-bg: #450a0a;
+      --tag-popup-fg: #fca5a5;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 360px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    user-select: none;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--success); box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+    transition: all .2s;
+  }
+  body.off .dot {
+    background: var(--danger); box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+  }
+  .title { font-weight: 700; font-size: 14px; }
+  .sub { font-size: 11.5px; color: var(--muted); }
+
+  /* Switches */
+  .switch { position: relative; display: inline-block; width: 38px; height: 22px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .track {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #cbd5e1; border-radius: 999px; transition: .2s;
+  }
+  .switch input:checked + .track { background: var(--accent); }
+  .knob {
+    position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 50%; background: #ffffff;
+    transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  }
+  .switch input:checked + .track .knob { transform: translateX(16px); }
+
+  /* Current Site Bar */
+  .current-site-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .site-info { display: flex; flex-direction: column; overflow: hidden; }
+  .site-label { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .site-host {
+    font-weight: 600; font-size: 12.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .site-host.unavailable { color: var(--muted); font-weight: 400; font-style: italic; }
+
+  /* Buttons */
+  .btn {
+    font: inherit; font-size: 11.5px; font-weight: 500;
+    padding: 5px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid transparent; transition: all .15s; flex: none;
+  }
+  .btn.primary {
+    background: var(--accent); color: #fff;
+  }
+  .btn.primary:hover { background: var(--accent-hover); }
+  .btn.allowed {
+    background: var(--chip); color: var(--success); border-color: var(--chip-border);
+  }
+  .btn.allowed:hover { border-color: var(--danger); color: var(--danger); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Options Accordion / Box */
+  .options-box {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .opt-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .opt-item.highlight {
+    background: var(--tag-offsite-bg);
+    margin: -2px -6px;
+    padding: 5px 6px;
+    border-radius: 6px;
+  }
+  .opt-text { display: flex; flex-direction: column; }
+  .opt-name { font-weight: 600; font-size: 12px; display: flex; align-items: center; gap: 5px; }
+  .opt-desc { font-size: 11px; color: var(--muted); }
+  .mini-switch { position: relative; width: 32px; height: 18px; flex: none; }
+  .mini-switch input { opacity: 0; width: 0; height: 0; }
+  .mini-track {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #cbd5e1; border-radius: 999px; transition: .2s;
+  }
+  .mini-switch input:checked + .mini-track { background: var(--accent); }
+  .mini-knob {
+    position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%; background: #ffffff;
+    transition: transform .2s; box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  }
+  .mini-switch input:checked + .mini-track .mini-knob { transform: translateX(14px); }
+
+  /* Segmented Nav */
+  .tabs-nav {
+    display: flex;
+    border-bottom: 1px solid var(--line);
+    background: var(--card-bg);
+  }
+  .tab-btn {
+    flex: 1;
+    background: none; border: none; padding: 9px 8px;
+    font: inherit; font-size: 12px; font-weight: 500; color: var(--muted);
+    cursor: pointer; position: relative; text-align: center;
+    transition: color .15s;
+  }
+  .tab-btn.active {
+    color: var(--accent); font-weight: 600;
+  }
+  .tab-btn.active::after {
+    content: ''; position: absolute; bottom: -1px; left: 15%; right: 15%;
+    height: 2px; background: var(--accent); border-radius: 2px;
+  }
+
+  /* List & Action Bar */
+  .list-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 16px; font-size: 11.5px; color: var(--muted);
+    border-bottom: 1px solid var(--line);
+  }
+  .link {
+    background: none; border: none; padding: 0; font: inherit;
+    color: var(--accent); cursor: pointer;
+  }
+  .link:hover { text-decoration: underline; }
+  .link.danger { color: var(--danger); }
+
+  /* Activity List */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  ul { list-style: none; max-height: 260px; overflow-y: auto; }
+  li { padding: 9px 16px; border-bottom: 1px solid var(--line); }
+  li:last-child { border-bottom: none; }
+
+  .item-header {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .host-tag-wrap { display: flex; align-items: center; gap: 6px; overflow: hidden; }
+  .hostname {
+    font-weight: 600; font-size: 12.5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .tag {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    padding: 1px 6px; border-radius: 4px; flex: none;
+  }
+  .tag.offsite { background: var(--tag-offsite-bg); color: var(--tag-offsite-fg); }
+  .tag.redirect { background: var(--tag-redirect-bg); color: var(--tag-redirect-fg); }
+  .tag.blank { background: var(--tag-blank-bg); color: var(--tag-blank-fg); }
+  .tag.popup { background: var(--tag-popup-bg); color: var(--tag-popup-fg); }
+
+  .time { font-size: 11px; color: var(--muted); flex: none; }
+  .why {
+    font-size: 11.5px; color: var(--muted); margin-top: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .item-actions { display: flex; gap: 6px; margin-top: 7px; }
+  .mini {
+    font: inherit; font-size: 11px; font-weight: 500;
+    padding: 3px 8px; border-radius: 4px; cursor: pointer;
+    background: var(--chip); color: var(--fg);
+    border: 1px solid var(--chip-border); transition: all .15s;
+  }
+  .mini:hover { border-color: var(--accent); color: var(--accent); }
+  .mini.remove:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* Allowlist view */
+  .allowlist-box { max-height: 260px; overflow-y: auto; }
+  .entry {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px; border-bottom: 1px solid var(--line);
+    font-size: 12px; font-weight: 500;
+  }
+  .entry:last-child { border-bottom: none; }
+
+  /* Empty state */
+  .empty-state {
+    padding: 24px 20px; text-align: center; color: var(--muted);
+    font-size: 12px; line-height: 1.5;
+  }
+  .empty-icon { font-size: 20px; margin-bottom: 6px; }
+
+  /* Footer */
+  footer {
+    padding: 8px 16px; border-top: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; color: var(--muted); background: var(--card-bg);
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="dot"></div>
+      <div>
+        <div class="title">Popup &amp; Redirect Closer</div>
+        <div class="sub" id="state">Protection on</div>
+      </div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="toggle" checked />
+      <span class="track"><span class="knob"></span></span>
+    </label>
+  </header>
+
+  <!-- Current Site Bar -->
+  <div class="current-site-bar">
+    <div class="site-info">
+      <span class="site-label">Current Website</span>
+      <span class="site-host" id="currenthost">Detecting...</span>
+    </div>
+    <button class="btn primary" id="allowcurrent" disabled>Allow this site</button>
+  </div>
+
+  <!-- Protection Controls -->
+  <div class="options-box">
+    <div class="opt-item highlight">
+      <div class="opt-text">
+        <span class="opt-name">🔗 Allow Same Domain / URL</span>
+        <span class="opt-desc">Allow popup if site starts with current site</span>
+      </div>
+      <label class="mini-switch">
+        <input type="checkbox" id="opt-same-domain" checked />
+        <span class="mini-track"><span class="mini-knob"></span></span>
+      </label>
+    </div>
+
+    <div class="opt-item highlight">
+      <div class="opt-text">
+        <span class="opt-name">👤 Allow User New Tabs</span>
+        <span class="opt-desc">Never close tabs opened by you (Ctrl+T, + button)</span>
+      </div>
+      <label class="mini-switch">
+        <input type="checkbox" id="opt-user-tabs" checked />
+        <span class="mini-track"><span class="mini-knob"></span></span>
+      </label>
+    </div>
+
+    <div class="opt-item">
+      <div class="opt-text">
+        <span class="opt-name">🚫 Close Popups</span>
+        <span class="opt-desc">Closes script, iframe &amp; popunder windows</span>
+      </div>
+      <label class="mini-switch">
+        <input type="checkbox" id="opt-popups" checked />
+        <span class="mini-track"><span class="mini-knob"></span></span>
+      </label>
+    </div>
+
+    <div class="opt-item">
+      <div class="opt-text">
+        <span class="opt-name">📄 Close Blank Links</span>
+        <span class="opt-desc">Closes about:blank &amp; empty tabs instantly</span>
+      </div>
+      <label class="mini-switch">
+        <input type="checkbox" id="opt-blank" checked />
+        <span class="mini-track"><span class="mini-knob"></span></span>
+      </label>
+    </div>
+
+    <div class="opt-item">
+      <div class="opt-text">
+        <span class="opt-name">🔀 Close Redirects</span>
+        <span class="opt-desc">Closes tabs redirecting through hops/trackers</span>
+      </div>
+      <label class="mini-switch">
+        <input type="checkbox" id="opt-redirects" checked />
+        <span class="mini-track"><span class="mini-knob"></span></span>
+      </label>
+    </div>
+
+    <div class="opt-item">
+      <div class="opt-text">
+        <span class="opt-name">🌐 Close Off-Site Links</span>
+        <span class="opt-desc">Closes tabs leading off the current website</span>
+      </div>
+      <label class="mini-switch">
+        <input type="checkbox" id="opt-external" checked />
+        <span class="mini-track"><span class="mini-knob"></span></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Segmented Tabs -->
+  <nav class="tabs-nav">
+    <button class="tab-btn active" id="tab-btn-activity">Activity (<span id="count">0</span>)</button>
+    <button class="tab-btn" id="tab-btn-allowed">Allowed Sites (<span id="allowcount">0</span>)</button>
+  </nav>
+
+  <!-- Activity View -->
+  <div class="tab-content active" id="view-activity">
+    <div class="list-bar">
+      <span>Recently closed tabs</span>
+      <button class="link danger" id="clear" hidden>Clear history</button>
+    </div>
+    <ul id="list"></ul>
+    <div class="empty-state" id="empty">
+      <div class="empty-icon">🛡️</div>
+      No popups closed yet.<br />
+      Browse normally — popups, redirects &amp; off-site links are closed instantly.
+    </div>
+  </div>
+
+  <!-- Allowed Sites View -->
+  <div class="tab-content" id="view-allowed">
+    <div class="list-bar">
+      <span>Excluded from closing</span>
+      <button class="link danger" id="reset">Reset allowlist</button>
+    </div>
+    <div class="allowlist-box" id="allowlist"></div>
+  </div>
+
+  <footer>
+    <span>🛡️ OAuth logins &amp; search engines preserved</span>
+    <span>v1.1</span>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

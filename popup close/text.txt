@@ -1,0 +1,5 @@
+popup-ad-killer/
+├── manifest.json     ← the missing one — save this first
+├── background.js
+├── popup.html
+└── popup.js
