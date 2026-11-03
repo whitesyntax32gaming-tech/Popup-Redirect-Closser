@@ -84,7 +84,7 @@ popup-close/
 
 1. Clone or download this repository to your local computer:
    ```bash
-   git clone https://github.com/<your-username>/popup-redirect-closer.git
+   git clone https://github.com/<whitesyntax32gaming-tech>/popup-redirect-closer.git
    ```
 2. Open Google Chrome (or any Chromium browser such as Edge, Brave, or Opera).
 3. Navigate to `chrome://extensions/`.
